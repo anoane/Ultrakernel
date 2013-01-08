@@ -12,7 +12,7 @@ obj-y += dex_comm.o
 endif
 obj-y += pwrtest.o
 obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
-obj-y += proc_comm.o
+obj-y += proc_comm.o cust_mproc.o
 obj-y += amss_para.o
 obj-$(CONFIG_ARCH_MSM_ARM11) += acpuclock-arm11.o idle.o
 obj-$(CONFIG_ARCH_QSD8X50) += arch-init-scorpion.o acpuclock-scorpion.o
@@ -522,7 +522,7 @@ endif
 
 obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
 ifdef CONFIG_MSM_V2_TLMM
-obj-y	+= gpio-v2.o
+obj-y	+= gpio-v2.o 
 else
 obj-y	+= gpio.o generic_gpio.o
 endif

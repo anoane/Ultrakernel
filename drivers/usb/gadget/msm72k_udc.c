@@ -146,7 +146,7 @@ static void usb_do_remote_wakeup(struct work_struct *w);
 #define USB_CHG_DET_DELAY	msecs_to_jiffies(1000)
 #define REMOTE_WAKEUP_DELAY	msecs_to_jiffies(1000)
 #define PHY_STATUS_CHECK_DELAY	msecs_to_jiffies(1000)
-#define DETECT_NODELL_USB_WALLCHARGER	1
+#undef DETECT_NODELL_USB_WALLCHARGER	//1
 
 struct usb_info {
 	/* lock for register/queue/device state changes */
@@ -217,7 +217,7 @@ struct usb_info {
 	struct otg_transceiver *xceiv;
 	enum usb_device_state usb_state;
 	struct wake_lock	wlock;
-#if DETECT_NODELL_USB_WALLCHARGER	
+#ifdef DETECT_NODELL_USB_WALLCHARGER	
 	atomic_t	not_good_wallcharger;
 #endif	
 };
@@ -283,7 +283,7 @@ static inline enum chg_type usb_get_chg_type(struct usb_info *ui)
 		return USB_CHG_TYPE__WALLCHARGER;
 	else
 	{
-#if DETECT_NODELL_USB_WALLCHARGER		
+#ifdef DETECT_NODELL_USB_WALLCHARGER		
 		if (atomic_read(&ui->not_good_wallcharger)==USB_SPEED_UNKNOWN)
 		{
 			printk(KERN_ERR "NotGoodWallcharger\n");
@@ -1150,7 +1150,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 			spin_lock_irqsave(&ui->lock, flags);
 			ui->gadget.speed = USB_SPEED_FULL;
 			spin_unlock_irqrestore(&ui->lock, flags);
-#if DETECT_NODELL_USB_WALLCHARGER			
+#ifdef DETECT_NODELL_USB_WALLCHARGER			
 			atomic_set(&ui->not_good_wallcharger, USB_SPEED_FULL);
 #endif			
 			break;
@@ -1159,7 +1159,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 			spin_lock_irqsave(&ui->lock, flags);
 			ui->gadget.speed = USB_SPEED_LOW;
 			spin_unlock_irqrestore(&ui->lock, flags);
-#if DETECT_NODELL_USB_WALLCHARGER						
+#ifdef DETECT_NODELL_USB_WALLCHARGER						
 			atomic_set(&ui->not_good_wallcharger, USB_SPEED_LOW);
 #endif			
 			break;
@@ -1168,7 +1168,7 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 			spin_lock_irqsave(&ui->lock, flags);
 			ui->gadget.speed = USB_SPEED_HIGH;
 			spin_unlock_irqrestore(&ui->lock, flags);
-#if DETECT_NODELL_USB_WALLCHARGER						
+#ifdef DETECT_NODELL_USB_WALLCHARGER						
 			atomic_set(&ui->not_good_wallcharger, USB_SPEED_HIGH);
 #endif			
 			break;
@@ -1314,10 +1314,13 @@ static void usb_reset(struct usb_info *ui)
 {
 	struct msm_otg *otg = to_msm_otg(ui->xceiv);
 
-	dev_dbg(&ui->pdev->dev, "reset controller\n");
+	dev_dbg(&ui->pdev->dev, "reset controller: %d\n", ui->gadget.is_a_peripheral);
 
 	atomic_set(&ui->running, 0);
 
+	if (otg->set_clk) {
+		otg->set_clk(ui->xceiv, 1);
+	}
 	/*
 	 * PHY reset takes minimum 100 msec. Hence reset only link
 	 * during HNP. Reset PHY and link in B-peripheral mode.
@@ -1349,6 +1352,10 @@ static void usb_reset(struct usb_info *ui)
 
 	/* enable interrupts */
 	writel(STS_URI | STS_SLI | STS_UI | STS_PCI, USB_USBINTR);
+
+        if (otg->set_clk) {
+                otg->set_clk(ui->xceiv, 0);
+        }
 
 	atomic_set(&ui->running, 1);
 }
@@ -1414,11 +1421,12 @@ static void usb_do_work(struct work_struct *w)
 		case USB_STATE_IDLE:
 			if (flags & USB_FLAG_START) {
 				int ret;
-
+#if 1 
 				if (!_vbus) {
 					ui->state = USB_STATE_OFFLINE;
 					break;
 				}
+#endif
 
 				pm_runtime_get_noresume(&ui->pdev->dev);
 				pm_runtime_resume(&ui->pdev->dev);
@@ -1632,7 +1640,7 @@ void msm_hsusb_set_vbus_state(int online)
 		ui->gadget.speed = USB_SPEED_UNKNOWN;
 		ui->usb_state = USB_STATE_NOTATTACHED;
 		ui->flags |= USB_FLAG_VBUS_OFFLINE;
-#if DETECT_NODELL_USB_WALLCHARGER			    	
+#ifdef DETECT_NODELL_USB_WALLCHARGER			    	
 		atomic_set(&ui->not_good_wallcharger, USB_SPEED_UNKNOWN);	
 #endif    
 	}
@@ -2378,7 +2386,7 @@ static int msm72k_probe(struct platform_device *pdev)
 	wake_lock_init(&ui->wlock,
 			WAKE_LOCK_SUSPEND, "usb_bus_active");
 
-#if DETECT_NODELL_USB_WALLCHARGER						
+#ifdef DETECT_NODELL_USB_WALLCHARGER						
 	atomic_set(&ui->not_good_wallcharger, USB_SPEED_UNKNOWN);							
 #endif	
 	usb_debugfs_init(ui);
@@ -2405,6 +2413,12 @@ static int msm72k_probe(struct platform_device *pdev)
 	}
 
 	pm_runtime_enable(&pdev->dev);
+
+#if 0
+	if(otg->set_clk) {
+		otg->set_clk(ui->xceiv, 1);
+	}
+#endif
 
 	/* Setup phy stuck timer */
 	if (ui->pdata && ui->pdata->is_phy_status_timer_on)
@@ -2488,7 +2502,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 
 	dev_dbg(&ui->pdev->dev, "registered gadget driver '%s'\n",
 			driver->driver.name);
-#if DETECT_NODELL_USB_WALLCHARGER			    	
+#ifdef DETECT_NODELL_USB_WALLCHARGER			    	
     atomic_set(&ui->not_good_wallcharger, USB_SPEED_UNKNOWN);	
 #endif    
 	usb_start(ui);

@@ -676,4 +676,88 @@ int gpio_tlmm_config(unsigned config, unsigned disable)
 }
 EXPORT_SYMBOL(gpio_tlmm_config);
 
+int msm_gpios_enable(const struct msm_gpio *table, int size)
+{
+        int rc;
+        int i;
+        const struct msm_gpio *g;
+        for (i = 0; i < size; i++) {
+                g = table + i;
+                rc = gpio_tlmm_config(g->gpio_cfg, GPIO_CFG_ENABLE);
+                if (rc) {
+                        pr_err("gpio_tlmm_config(0x%08x, GPIO_CFG_ENABLE)"
+                               " <%s> failed: %d\n",
+                               g->gpio_cfg, g->label ?: "?", rc);
+                        pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
+                               GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
+                               GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
+                               GPIO_DRVSTR(g->gpio_cfg));
+                        goto err;
+                }
+        }
+        return 0;
+err:
+        msm_gpios_disable(table, i);
+        return rc;
+}
+EXPORT_SYMBOL(msm_gpios_enable);
+
+int msm_gpios_disable(const struct msm_gpio *table, int size)
+{
+        int rc = 0;
+        int i;
+        const struct msm_gpio *g;
+        for (i = size-1; i >= 0; i--) {
+                int tmp;
+                g = table + i;
+                tmp = gpio_tlmm_config(g->gpio_cfg, GPIO_CFG_DISABLE);
+                if (tmp) {
+                        pr_err("gpio_tlmm_config(0x%08x, GPIO_CFG_DISABLE)"
+                               " <%s> failed: %d\n",
+                               g->gpio_cfg, g->label ?: "?", rc);
+                        pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
+                               GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
+                               GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
+                               GPIO_DRVSTR(g->gpio_cfg));
+                        if (!rc)
+                                rc = tmp;
+                }
+        }
+
+        return rc;
+}
+EXPORT_SYMBOL(msm_gpios_disable);
+
+int msm_gpios_request(const struct msm_gpio *table, int size)
+{
+        int rc;
+        int i;
+        const struct msm_gpio *g;
+        for (i = 0; i < size; i++) {
+                g = table + i;
+                rc = gpio_request(GPIO_PIN(g->gpio_cfg), g->label);
+                if (rc) {
+                        pr_err("gpio_request(%d) <%s> failed: %d\n",
+                               GPIO_PIN(g->gpio_cfg), g->label ?: "?", rc);
+                        goto err;
+                }
+        }
+        return 0;
+err:
+        msm_gpios_free(table, i);
+        return rc;
+}
+EXPORT_SYMBOL(msm_gpios_request);
+
+void msm_gpios_free(const struct msm_gpio *table, int size)
+{
+        int i;
+        const struct msm_gpio *g;
+        for (i = size-1; i >= 0; i--) {
+                g = table + i;
+                gpio_free(GPIO_PIN(g->gpio_cfg));
+        }
+}
+EXPORT_SYMBOL(msm_gpios_free);
+
 postcore_initcall(msm_init_gpio);

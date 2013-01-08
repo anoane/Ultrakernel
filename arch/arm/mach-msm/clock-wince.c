@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/list.h>
 #include <linux/err.h>
+#include <linux/pm_qos_params.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
@@ -1149,9 +1150,7 @@ int pc_clk_reset(unsigned id, enum clk_reset_action action)
 
 int clk_reset(struct clk *clk, enum clk_reset_action action)
 {
-	if (!clk->ops->reset)
-		clk->ops->reset = &pc_clk_reset;
-	return clk->ops->reset(clk->remote_id, action);
+	return pc_clk_reset(clk->id, action);
 }
 EXPORT_SYMBOL(clk_reset);
 
@@ -1221,17 +1220,54 @@ int clk_set_flags(struct clk *clk, unsigned long flags)
 }
 EXPORT_SYMBOL(clk_set_flags);
 
+static struct clk *ebi1_clk;
+static struct notifier_block axi_freq_notifier_block;
+
+static int axi_freq_notifier_handler(struct notifier_block *block,
+                                unsigned long min_freq, void *v)
+{
+        /* convert min_freq from KHz to Hz, unless it's a magic value */
+        if (min_freq != MSM_AXI_MAX_FREQ)
+                min_freq *= 1000;
+
+#if 0
+        switch (socinfo_get_msm_cpu()) {
+        case MSM_CPU_7X30:
+        case MSM_CPU_8X55:
+                /* On 7x30/8x55, ebi1_clk votes are dropped during power
+                 * collapse, but pbus_clk votes are not. Use pbus_clk to
+                 * implicitly request ebi1 and AXI rates. */
+                return clk_set_min_rate(ebi1_clk, min_freq);
+        case MSM_CPU_8X60:
+                /* The bus driver handles ebi1_clk requests on 8x60. */
+                return 0;
+        default:
+#endif
+                /* Update pm_qos vote for ebi1_clk. */
+                return clk_set_min_rate(ebi1_clk, min_freq);
+#if 0
+        }
+#endif
+}
 
 void __init msm_clock_init(void)
 {
-	struct clk *clk;
+        struct clk *clk;
 
-	spin_lock_init(&clocks_lock);
-	mutex_lock(&clocks_mutex);
-	for (clk = msm_clocks; clk && clk->name; clk++) {
-		list_add_tail(&clk->list, &clocks);
-	}
-	mutex_unlock(&clocks_mutex);
+        spin_lock_init(&clocks_lock);
+        mutex_lock(&clocks_mutex);
+        for (clk = msm_clocks; clk && clk->name; clk++) {
+                list_add_tail(&clk->list, &clocks);
+        }
+        mutex_unlock(&clocks_mutex);
+
+        ebi1_clk = clk_get(NULL, "ebi1_clk");
+
+        BUG_ON(IS_ERR(ebi1_clk));
+        clk_enable(ebi1_clk);
+
+        axi_freq_notifier_block.notifier_call = axi_freq_notifier_handler;
+        pm_qos_add_notifier(PM_QOS_SYSTEM_BUS_FREQ, &axi_freq_notifier_block);
 }
 
 void clk_enter_sleep(int from_idle)
@@ -1347,7 +1383,7 @@ struct clk_ops clk_ops_pcom = {
 	.enable = pc_clk_enable,
 	.disable = pc_clk_disable,
 	.auto_off = pc_clk_disable,
-//	.reset = pc_clk_reset,
+	.reset = pc_clk_reset,
 	.set_rate = pc_clk_set_rate,
 	.set_min_rate = pc_clk_set_min_rate,
 	.set_max_rate = pc_clk_set_max_rate,

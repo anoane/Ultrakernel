@@ -1493,7 +1493,7 @@ struct clk msm_clocks[] = {
 	CLK_ALL("grp_pclk", GRP_PCLK, NULL, OFF),
 #endif
 	CLK_ALL("spi_clk", SPI_CLK, NULL, 0),
-	CLK_ALL("usb_phy_clk", USB_PHY_CLK, NULL, USE_MIN),
+	CLK_ALL("usb_phy_clk", USB_PHY_CLK, NULL, 0),//USE_MIN),
 	CLK_8X50("lcdc_pclk_clk", LCDC_PCLK, &msm_device_mdp.dev, 0),
 	CLK_8X50("lcdc_pad_pclk_clk", LCDC_PAD_PCLK, &msm_device_mdp.dev, 0),
 	CLK_8X50("mdp_vsync_clk", MDP_VSYNC_CLK, &msm_device_mdp.dev, 0),

@@ -69,9 +69,13 @@
 #include <mach/board-htcleo-ts.h>
 #include <mach/socinfo.h>
 
+#include <mach/smem_pc_oem_cmd.h>
+#include <mach/custmproc.h>
+
 #include "board-htcleo.h"
 #include "devices.h"
 #include "proc_comm.h"
+#include "smd_private.h"
 #include "dex_comm.h"
 #include "footswitch.h"
 
@@ -88,9 +92,24 @@ extern void __init htcleo_audio_init(void);
 extern unsigned char *get_bt_bd_ram(void);
 static unsigned int nand_boot = 0;
 
+#define NV_UE_IMEI_SIZE     9   
+#define SERIAL_NO_SIZE      16  
+#define DRM_KEY_SIZE        400 
+#define BT_MAC_ADDR_SIZE    12  
+#define WLAN_MAC_ADDR_SIZE  12  
+
+typedef struct
+{
+   uint8_t    imei[NV_UE_IMEI_SIZE];
+   uint8_t    serial_no[SERIAL_NO_SIZE];
+   uint8_t    drm_key[DRM_KEY_SIZE];
+   uint8_t    bt_mac_addr[BT_MAC_ADDR_SIZE];
+   uint8_t    wlan_mac_addr[WLAN_MAC_ADDR_SIZE];
+} device_otp_data_s_from_dt_or_diag;
+
 char qisda_imei_serialnum[17] = "1234567890ABCDEF";
-int adb_debugging = 0;
-int qct_usbdiag_debugging = 0;
+int adb_debugging = 1;
+int qct_usbdiag_debugging = 1;
 
 ///////////////////////////////////////////////////////////////////////
 // Nand boot Option
@@ -382,13 +401,16 @@ static struct vreg *vreg_usb;
 static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 {
 
+	pr_info("hsusb set vbus power: %d\n", on);
         switch (PHY_TYPE(phy_info)) {
         case USB_PHY_INTEGRATED:
+#if 0
                 if (on)
                         msm_hsusb_vbus_powerup();
                 else
                         msm_hsusb_vbus_shutdown();
                 break;
+#endif
         case USB_PHY_SERIAL_PMIC:
                 if (on)
                         vreg_enable(vreg_usb);
@@ -544,6 +566,8 @@ static int msm_hsusb_ldo_init(int init)
                         if (IS_ERR(vreg_5v))
                                 return PTR_ERR(vreg_5v);
                         vreg_set_level(vreg_5v, 5000);
+
+			pr_info("vreg boost: 5v\n");
                 }
 
                 vreg_3p3 = vreg_get(NULL, "usb");
@@ -573,6 +597,8 @@ static int msm_hsusb_ldo_enable(int enable)
                 return -ENODEV;
 
         ldo_status = enable;
+
+	pr_info("%s: action: %d\n", __func__, enable);
 
         if (enable) {
                 if (regulator_3p3_is_internal) {
@@ -664,6 +690,122 @@ unsigned htcleo_get_vbus_state(void)
 		return 0;
 }
 
+#ifndef CONFIG_TINY_ANDROID
+static void msm_get_usb_serial(void)
+{
+    int size;
+    int iindex;
+    device_otp_data_s_from_dt_or_diag *otp_data;
+
+    {
+        unsigned int rpc_arg2 = 0, rpc_arg1 = 0;
+        int retValue = 0;
+
+        rpc_arg1 = SMEM_PC_OEM_USB_DEFAULT_SERIAL_NUMBER_STATUS;
+        retValue = cust_mproc_comm1(&rpc_arg1, &rpc_arg2);
+
+        if (retValue != 0)
+        {
+            printk("%s: proc_comm failed\n", __func__);
+        }
+        else if (rpc_arg2 == 1)
+        {
+            printk("%s: usb single serial number\n", __func__);
+            return;
+        }
+    }
+
+    otp_data = (device_otp_data_s_from_dt_or_diag*)
+        smem_item(SMEM_OTP_DATA_FROM_DT_OR_DIAG, &size);
+
+    if ((otp_data == NULL) || (otp_data->imei[0] != 0x8))
+    {
+        printk("%s, IMEI parameter failure...\n", __func__);
+    }
+    else
+    {
+        uint8_t tmpusbsn[16];
+        char *tmpptr_usbsn = tmpusbsn;
+        uint8_t imei_d;
+        for(iindex = 1; iindex < 8; iindex++)
+        {
+            imei_d = otp_data->imei[iindex];
+            *tmpptr_usbsn++ = ((imei_d & 0xf0) >> 4);
+
+            imei_d = otp_data->imei[iindex + 1];
+            *tmpptr_usbsn++ = (imei_d & 0xf);
+        }
+        *tmpptr_usbsn++ = ((otp_data->imei[8] & 0xf0) >> 4);
+        sprintf(qisda_imei_serialnum,
+                "%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x%01x",
+                0,
+                tmpusbsn[0], tmpusbsn[1],
+                tmpusbsn[2], tmpusbsn[3],
+                tmpusbsn[4], tmpusbsn[5],
+                tmpusbsn[6], tmpusbsn[7],
+                tmpusbsn[8], tmpusbsn[9],
+                tmpusbsn[10], tmpusbsn[11],
+                tmpusbsn[12], tmpusbsn[13],
+                tmpusbsn[14]);
+
+        printk ("board-qsd8x50_austinc %s: %s\n", __func__, qisda_imei_serialnum);
+    }
+}
+#else
+static void msm_get_usb_serial(void) {}
+#endif
+
+static void msm_hsusb_get_qctusb_driver(void)
+{
+    unsigned int rpc_arg2 = 0, rpc_arg1 = 0;
+    int retValue = 0;
+
+    rpc_arg1 = SMEM_PC_OEM_QCT_USB_DRIVER_STATUS;
+    retValue = cust_mproc_comm1(&rpc_arg1, &rpc_arg2);
+
+    if (retValue != 0)
+    {
+        printk("%s: proc_comm failed\n", __func__);
+        qct_usbdiag_debugging = 0;
+    }
+    else if (rpc_arg2 == 0) /* no debugging */
+    {
+        printk("%s: disable usb debugging functions\n", __func__);
+        qct_usbdiag_debugging = 0;
+    }
+    else
+    {
+        printk("%s: enable usb debugging functions\n", __func__);
+        qct_usbdiag_debugging = 1;
+    }
+    printk("Sonia::%s:qct_usbdiag_debugging=%d rpc_arg2=%d\n",__func__,qct_usbdiag_debugging,rpc_arg2);
+
+
+
+#ifdef CONFIG_BUILDTYPE_SHIP
+    rpc_arg1 = SMEM_PC_OEM_ADB_PERMISSION_STATUS;
+    rpc_arg2 = 0;
+    retValue = cust_mproc_comm1(&rpc_arg1, &rpc_arg2);
+    if (retValue != 0)
+    {
+        printk("%s: proc_comm failed(build_ship)\n", __func__);
+        adb_debugging = 0;
+    }
+    else if (rpc_arg2 == 0) /* no debugging */
+    {
+        printk("%s: disable adb debugging functions(build ship) %d\n", __func__, rpc_arg2);
+        adb_debugging = 0;
+    }
+    else
+    {
+        printk("%s: enable adb debugging functions %d(buuild_ship)\n", __func__, rpc_arg2);
+        adb_debugging = 1;
+    }
+#else
+    adb_debugging = 1;
+#endif
+    printk("%s: enable adb debugging functions adb_debugging %d\n", __func__,adb_debugging);
+}
 
 ///////////////////////////////////////////////////////////////////////
 // Flashlight
@@ -1342,6 +1484,9 @@ static void __init htcleo_init(void)
         msm_device_otg.dev.platform_data = &msm_otg_pdata;
         msm_device_gadget_peripheral.dev.platform_data = &msm_gadget_pdata;
         msm_gadget_pdata.is_phy_status_timer_on = 1;
+
+        //msm_get_usb_serial();
+        //msm_hsusb_get_qctusb_driver();
 
 #ifdef CONFIG_USB_ANDROID
 	htcleo_add_usb_devices();

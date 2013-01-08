@@ -275,6 +275,7 @@ typedef enum {
 	SMEM_SMD_BRIDGE_ALLOC_TABLE,
 	SMEM_SMDLITE_TABLE,
 	SMEM_SD_IMG_UPGRADE_STATUS,
+	#include "mach/oem_smem.h"
 	SMEM_SEFS_INFO,
 #else
 	SMEM_SMD_FIFO_BASE_ID,

@@ -100,7 +100,7 @@ static void msm_xusb_enable_clks(struct msmusb_hcd *mhcd)
 		clk_enable(mhcd->pclk);
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 		return;
 	}
@@ -123,7 +123,7 @@ static void msm_xusb_disable_clks(struct msmusb_hcd *mhcd)
 		clk_disable(mhcd->pclk);
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 		return;
 	}
@@ -144,7 +144,7 @@ static int usb_wakeup_phy(struct usb_hcd *hcd)
 		ret = msm_fsusb_resume_phy();
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 	}
 
@@ -165,7 +165,7 @@ static int usb_suspend_phy(struct usb_hcd *hcd)
 		ret = msm_fsusb_suspend_phy();
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 		ret = -ENODEV;
 		break;
@@ -182,27 +182,27 @@ static int usb_lpm_enter(struct usb_hcd *hcd)
 
 	disable_irq(hcd->irq);
 	if (mhcd->in_lpm) {
-		pr_info("%s: already in lpm. nothing to do\n", __func__);
+		USB_INFO("%s: already in lpm. nothing to do\n", __func__);
 		enable_irq(hcd->irq);
 		return 0;
 	}
 
 	if (HC_IS_RUNNING(hcd->state)) {
-		pr_info("%s: can't enter into lpm. controller is runnning\n",
+		USB_INFO("%s: can't enter into lpm. controller is runnning\n",
 			__func__);
 		enable_irq(hcd->irq);
 		return -1;
 	}
 
-	pr_info("%s: lpm enter procedure started\n", __func__);
+	USB_INFO("%s: lpm enter procedure started\n", __func__);
 
 	mhcd->in_lpm = 1;
 
 	if (usb_suspend_phy(hcd)) {
 		mhcd->in_lpm = 0;
 		enable_irq(hcd->irq);
-		pr_info("phy suspend failed\n");
-		pr_info("%s: lpm enter procedure end\n", __func__);
+		USB_INFO("phy suspend failed\n");
+		USB_INFO("%s: lpm enter procedure end\n", __func__);
 		return -1;
 	}
 
@@ -214,7 +214,7 @@ static int usb_lpm_enter(struct usb_hcd *hcd)
 	if (device_may_wakeup(dev))
 		enable_irq_wake(hcd->irq);
 	enable_irq(hcd->irq);
-	pr_info("%s: lpm enter procedure end\n", __func__);
+	USB_INFO("%s: lpm enter procedure end\n", __func__);
 	return 0;
 }
 
@@ -231,7 +231,7 @@ void usb_lpm_exit_w(struct work_struct *work)
 
 
 	if (usb_wakeup_phy(hcd)) {
-		pr_err("fatal error: cannot bring phy out of lpm\n");
+		USB_ERR("fatal error: cannot bring phy out of lpm\n");
 		return;
 	}
 
@@ -290,7 +290,7 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 
 	ret = ehci_bus_suspend(hcd);
 	if (ret) {
-		pr_err("ehci_bus suspend faield\n");
+		USB_ERR("ehci_bus suspend faield\n");
 		return ret;
 	}
 	if (PHY_TYPE(mhcd->pdata->phy_info) == USB_PHY_INTEGRATED)
@@ -573,7 +573,7 @@ static int msm_xusb_init_phy(struct msmusb_hcd *mhcd)
 		msm_xusb_disable_clks(mhcd);
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 	}
 
@@ -595,7 +595,7 @@ static int msm_xusb_rpc_close(struct msmusb_hcd *mhcd)
 		msm_fsusb_rpc_deinit();
 		break;
 	default:
-		pr_err("%s: undefined phy type ( %X ) \n", __func__,
+		USB_ERR("%s: undefined phy type ( %X ) \n", __func__,
 						pdata->phy_info);
 	}
 	return retval;
@@ -672,7 +672,7 @@ static int msm_xusb_init_host(struct msmusb_hcd *mhcd)
 		}
 		break;
 	default:
-		pr_err("phy type is bad\n");
+		USB_ERR("phy type is bad\n");
 	}
 	return ret;
 }
@@ -760,7 +760,7 @@ static void msm_xusb_uninit_host(struct msmusb_hcd *mhcd)
 		msm_fsusb_rpc_deinit();
 		break;
 	default:
-		pr_err("phy type is bad\n");
+		USB_ERR("phy type is bad\n");
 	}
 }
 static int __exit ehci_msm_remove(struct platform_device *pdev)

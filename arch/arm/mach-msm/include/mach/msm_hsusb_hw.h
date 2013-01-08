@@ -17,6 +17,24 @@
 #ifndef __LINUX_USB_GADGET_MSM72K_UDC_H__
 #define __LINUX_USB_GADGET_MSM72K_UDC_H__
 
+#define USB_ERR(fmt, args...) \
+        printk(KERN_ERR "[USB:ERR] " fmt, ## args)
+#define USB_WARNING(fmt, args...) \
+        printk(KERN_WARNING "[USB] " fmt, ## args)
+#define USB_INFO(fmt, args...) \
+        printk(KERN_INFO "[USB] " fmt, ## args)
+#define USB_DEBUG(fmt, args...) \
+        printk(KERN_DEBUG "[USB] " fmt, ## args)
+
+#define USBH_ERR(fmt, args...) \
+        printk(KERN_ERR "[USBH:ERR] " fmt, ## args)
+#define USBH_WARNING(fmt, args...) \
+        printk(KERN_WARNING "[USBH] " fmt, ## args)
+#define USBH_INFO(fmt, args...) \
+        printk(KERN_INFO "[USBH] " fmt, ## args)
+#define USBH_DEBUG(fmt, args...) \
+        printk(KERN_DEBUG "[USBH] " fmt, ## args)
+
 #define USB_ID               (MSM_USB_BASE + 0x0000)
 #define USB_HWGENERAL        (MSM_USB_BASE + 0x0004)
 #define USB_HWHOST           (MSM_USB_BASE + 0x0008)
@@ -172,12 +190,15 @@ struct ept_queue_item {
 #define ULPI_CONFIG_REG1	0x30
 #define ULPI_CONFIG_REG2	0X31
 #define ULPI_CONFIG_REG3	0X32
+#define ULPI_IFC_CTRL           0x07
 #define ULPI_IFC_CTRL_CLR	0x09
 #define ULPI_AMPLITUDE_MAX	0x0C
 #define ULPI_OTG_CTRL		0x0B
 #define ULPI_OTG_CTRL_CLR       0x0C
 #define ULPI_INT_RISE_CLR       0x0F
+#define ULPI_INT_RISE       	0x0D
 #define ULPI_INT_FALL_CLR       0x12
+#define ULPI_INT_FALL           0x10
 #define ULPI_PRE_EMPHASIS_MASK	(3 << 4)
 #define ULPI_DRV_AMPL_MASK	(3 << 2)
 #define ULPI_ONCLOCK	       (1 << 6)
@@ -275,7 +296,12 @@ struct ept_queue_item {
 
 #define ULPI_DEBUG               0x15
 #define ULPI_FUNC_CTRL_CLR       0x06
+#define ULPI_FUNC_CTRL       	 0x04
+#define ULPI_CARKIT_CTRL         0x19
+#define ULPI_CARKIT_INT          0x1D
+#define ULPI_CARKIT_STS          0x20
 #define ULPI_SUSPENDM            (1 << 6)
+#define ULPI_CARKIT_MODE     	 (1 << 2)
 #define ULPI_CLOCK_SUSPENDM     (1 << 3)
 #define ULPI_CALIB_STS          (1 << 7)
 #define ULPI_CALIB_VAL(x)       (x & 0x7C)
